@@ -1,0 +1,114 @@
+name: CrowdedSea PR Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, labeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  AMOY_RPC_URL: ${{ secrets.AMOY_RPC_URL }}
+  BOUNTYPOOL_ADDRESS: ${{ secrets.BOUNTYPOOL_ADDRESS }}
+
+jobs:
+  # ── 1. Run tests ───────────────────────────────
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npx hardhat test
+
+  # ── 2. Verify bounty balance on-chain ──────────
+  balance-check:
+    name: Verify Bounty Balance
+    runs-on: ubuntu-latest
+    outputs:
+      has_balance: ${{ steps.check.outputs.has_balance }}
+      pool_balance: ${{ steps.check.outputs.pool_balance }}
+    steps:
+      - name: Check BountyPool contract balance
+        id: check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Minimal ethers.js balance check via RPC
+            const rpc = process.env.AMOY_RPC_URL || 'https://rpc-amoy.polygon.technology';
+            const contract = process.env.BOUNTYPOOL_ADDRESS;
+
+            if (!contract) {
+              core.setOutput('has_balance', 'false');
+              core.setOutput('pool_balance', '0');
+              core.warning('BOUNTYPOOL_ADDRESS not set — skipping balance check');
+              return;
+            }
+
+            // eth_getBalance RPC call
+            const resp = await fetch(rpc, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                jsonrpc: '2.0', id: 1,
+                method: 'eth_getBalance',
+                params: [contract, 'latest']
+              })
+            });
+            const { result } = await resp.json();
+            const balanceWei = BigInt(result);
+            const balanceEth = Number(balanceWei) / 1e18;
+
+            core.info(`Pool balance: ${balanceEth} ETH (${balanceWei} wei)`);
+            core.setOutput('has_balance', balanceWei > 0n ? 'true' : 'false');
+            core.setOutput('pool_balance', balanceEth.toFixed(6));
+
+      - name: Post balance comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const balance = '${{ steps.check.outputs.pool_balance }}';
+            const has = '${{ steps.check.outputs.has_balance }}' === 'true';
+            const icon = has ? '✅' : '⚠️';
+            const body = `${icon} **Bounty Pool Balance:** ${balance} ETH\n\n` +
+              (has
+                ? 'Funds available — this PR is eligible for bounty payout on merge.'
+                : 'No funds in pool. Deposit required before payout.');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
+
+  # ── 3. Auto-merge if tests pass + approved label ─
+  auto-merge:
+    name: Auto-Merge (if approved)
+    needs: [test, balance-check]
+    runs-on: ubuntu-latest
+    if: contains(github.event.pull_request.labels.*.name, 'approved')
+    steps:
+      - name: Merge PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const hasBalance = '${{ needs.balance-check.outputs.has_balance }}' === 'true';
+            if (!hasBalance) {
+              core.setFailed('Cannot auto-merge: bounty pool has no balance');
+              return;
+            }
+
+            await github.rest.pulls.merge({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              merge_method: 'squash'
+            });
+
+            core.info('🎉 PR merged via CrowdedSea auto-merge');

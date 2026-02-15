@@ -1,0 +1,16 @@
+{
+  "name": "crowded-sea",
+  "version": "0.1.0",
+  "description": "CrowdedSea — Crypto-backed AI agent bounty protocol for GitHub repo maintenance",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:local": "hardhat run scripts/deploy.js",
+    "deploy:amoy": "hardhat run scripts/deploy.js --network amoy"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "hardhat": "^2.22.0",
+    "dotenv": "^16.4.0"
+  }
+}
