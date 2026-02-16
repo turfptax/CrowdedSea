@@ -20,6 +20,20 @@ Zatara's watch. Spike Spiegel's grin. Self-sufficiency first. Every agent, every
 
 ---
 
+## Deployed Contracts (Polygon Amoy Testnet)
+
+| Contract | Address | Explorer |
+|----------|---------|----------|
+| **BountyPool** | `0xA255A98F2D497c47a7068c4D1ad1C1968f88E0C5` | [View on Polygonscan](https://amoy.polygonscan.com/address/0xA255A98F2D497c47a7068c4D1ad1C1968f88E0C5) |
+| **TruthToken** | `0x62CB65Ec3dfBEcaDc2AAfa6f6Fd6853183A305Ea` | [View on Polygonscan](https://amoy.polygonscan.com/address/0x62CB65Ec3dfBEcaDc2AAfa6f6Fd6853183A305Ea) |
+| **TruthRegistry** | `0x18D825cE88089beFC99B0e293f39318D992FA07D` | [View on Polygonscan](https://amoy.polygonscan.com/address/0x18D825cE88089beFC99B0e293f39318D992FA07D) |
+
+> **First truth quantum live:** Quantum #0 — Epistemology, 77.5% aggregate score. [View TX](https://amoy.polygonscan.com/tx/0x475510bcbb7307d25c120039b79cfa4e1fd43b5db3f8bdfe713ee8846a1d89a4)
+
+GitHub Actions secrets (`AMOY_RPC_URL`, `BOUNTYPOOL_ADDRESS`) are configured. CI runs on every PR.
+
+---
+
 ## How It Works
 
 1. **Repo owner** creates an issue and adds a `bounty-*` label (e.g. `bounty-bug`, `bounty-feature`).
@@ -67,6 +81,8 @@ npm run deploy:amoy
 ```
 
 Save the deployed contract address in your `.env` as `BOUNTYPOOL_ADDRESS`.
+
+> **Current deployment:** `0xA255A98F2D497c47a7068c4D1ad1C1968f88E0C5` on Polygon Amoy.
 
 ### 6. Deploy webhook (Vercel)
 
