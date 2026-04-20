@@ -11,6 +11,46 @@
 
 const crypto = require("crypto");
 
+// ── Retry logic for fetch requests ──────────────
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 1000; // 1 second base delay
+const TIMEOUT_MS = 5000; // 5 second timeout
+
+async function fetchWithRetry(url, options, retries = MAX_RETRIES) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      return response;
+    } catch (error) {
+      const isLastAttempt = attempt === retries;
+      const isTimeout = error.name === 'AbortError';
+
+      if (isLastAttempt) {
+        console.error(`Fetch failed after ${retries} attempts:`, error.message);
+        throw error;
+      }
+
+      const delay = RETRY_DELAY_MS * attempt; // Exponential backoff
+      console.warn(`Attempt ${attempt}/${retries} failed (${isTimeout ? 'timeout' : error.message}), retrying in ${delay}ms...`);
+      
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+}
+
 // ── Signature verification ──────────────────────
 function verifySignature(body, signature, secret) {
   if (!secret) return true; // skip in dev
@@ -24,7 +64,7 @@ function verifySignature(body, signature, secret) {
 async function postDiscord(content) {
   const url = process.env.DISCORD_WEBHOOK_URL;
   if (!url) return;
-  await fetch(url, {
+  await fetchWithRetry(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ content }),
@@ -34,7 +74,7 @@ async function postDiscord(content) {
 async function postSlack(text) {
   const url = process.env.SLACK_WEBHOOK_URL;
   if (!url) return;
-  await fetch(url, {
+  await fetchWithRetry(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text }),
